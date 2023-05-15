@@ -1,10 +1,10 @@
 {
   "configurations": [
     {
-      "type": "chrome",
-      "name": "ws:/127.0.0.1:56363/c3869134-e19e-4a2e-8332-298073cacf9a",
+      "type": "node",
+      "name": "launch webhook server",
       "request": "launch",
-      "url": "ws:/127.0.0.1:56363/c3869134-e19e-4a2e-8332-298073cacf9a"
+      "program": "${workspaceFolder}/app.js"
     }
   ]
 }
