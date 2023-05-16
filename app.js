@@ -6,6 +6,9 @@
  */
 
 "use strict";
+
+const first = require("lodash/first");
+
 // require axios for making http requests
 
 // Access token for your app
@@ -30,8 +33,8 @@ app.get("/", (req, res) => {
 });
 
 const strapiUrl = axios.create({
-  baseURL: "https://ntaflowstrapi.up.railway.app/",
-  // baseURL: "http://localhost:1337/api/",
+  // baseURL: "https://dentaflowstrapi.up.railway.app/",
+  baseURL: "http://localhost:1337/api/",
   headers: {
     "Content-Type": "application/json",
     Authorization:
@@ -49,8 +52,12 @@ app.post("/webhook", (req, res) => {
   console.log(JSON.stringify(req.body, null, 2));
 
   const changeReminderStatus = async (params) => {
-    const { message_id, appointment_id, reminderStatusReference, newStatus } =
-      params;
+    const {
+      message_id,
+      appointment_id,
+      reminderStatusReference = [],
+      newStatus,
+    } = params;
 
     const reminderStatusUpdated = [
       ...reminderStatusReference,
@@ -63,7 +70,7 @@ app.post("/webhook", (req, res) => {
     try {
       const response = await axios({
         method: "PUT",
-        url: `https://dentaflowstrapi.up.railway.app/api/appointments/${appointment_id}`,
+        url: `http://localhost:1337/api/appointments/${appointment_id}`,
         headers: {
           "Content-Type": "application/json",
           Authorization:
@@ -82,6 +89,36 @@ app.post("/webhook", (req, res) => {
     }
   };
 
+  const changeReminderReplyStatus = async (conversationId) => {
+    console.log("conversationId", conversationId);
+    const payload = {
+      replied: true,
+      repliedAt: new Date(),
+      msg_id_replied: req.body.entry[0].changes[0].value.messages[0].id,
+    };
+    try {
+      const response = await axios({
+        method: "PUT",
+        url: `http://localhost:1337/api/conversations/${conversationId}`,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:
+            "Bearer " +
+            "e474145b413004a5480039e56b3544a1a06881264788a7adf18994891babcf4637e4d7be3cfb11be06023797ec191928758dcc254b0ef0f8572b5253a1bbe8c986efe93fe528e6472676d14dca168e7f5a0c9f265e7248b0a160748701877039380e836c556e8634d59471d08f608a74622a10292a315cdc7532822d37d12517",
+        },
+
+        data: {
+          data: {
+            reminder_reply_status: JSON.stringify(payload),
+          },
+        },
+      });
+      console.log("response", response.data);
+    } catch (error) {
+      console.error("error changing reminder_reply_status", error);
+    }
+  };
+
   const getConversationByMessageId = async (message_id) => {
     try {
       const response = await axios({
@@ -92,26 +129,71 @@ app.post("/webhook", (req, res) => {
             "Bearer " +
             "e474145b413004a5480039e56b3544a1a06881264788a7adf18994891babcf4637e4d7be3cfb11be06023797ec191928758dcc254b0ef0f8572b5253a1bbe8c986efe93fe528e6472676d14dca168e7f5a0c9f265e7248b0a160748701877039380e836c556e8634d59471d08f608a74622a10292a315cdc7532822d37d12517",
         },
-        url: `https://dentaflowstrapi.up.railway.app/api/conversations?populate=*&filters[init_message_id]${message_id}`,
+        url: `http://localhost:1337/api/conversations?populate=*&filters[init_message_id]=${message_id}`,
       });
-      //   `https://dentaflowstrapi.up.railway.app/conversations?populate=*&filters[init_message_id][$eq]=wamid.HBgMNTkzOTkzOTUwMTM3FQIAERgSNjVBRENBMzg5QTUxRDU0NTJEAA==`
-      // );
 
       console.log("conversation data", response.data);
+      console.log("message_id from get", message_id);
       if (response.data?.data.length > 0) {
         console.log("conversation data inside", response.data.data[0]);
+        const conversationId = response.data.data[0].id;
+
         const appointment_id =
           response.data.data[0].attributes.appointment.data.id;
+
         const reminderStatusReference =
           response.data.data[0].attributes.appointment.data.attributes
             .reminderStatus;
 
-        changeReminderStatus({
-          message_id,
-          appointment_id,
-          reminderStatusReference,
-          newStatus: "read",
-        });
+        const reminder_reply_status =
+          response.data.data[0].attributes.reminder_reply_status?.replied ??
+          false;
+
+        console.log("reminder_reply_status", reminder_reply_status);
+
+        console.log("before setting MessageStatus");
+        const isMessageStatus = !!req.body.entry[0].changes[0].value?.statuses;
+        if (isMessageStatus) {
+          const messageStatus =
+            req.body.entry[0].changes[0].value?.statuses[0].status;
+
+          console.log("messageStatus", messageStatus);
+          if (messageStatus === "delivered") {
+            changeReminderStatus({
+              message_id,
+              appointment_id,
+              reminderStatusReference,
+              newStatus: "sent",
+            });
+          }
+          if (messageStatus === "read") {
+            changeReminderStatus({
+              message_id,
+              appointment_id,
+              reminderStatusReference,
+              newStatus: "read",
+            });
+            return;
+          }
+        }
+
+        const buttonPayload =
+          req.body.entry[0].changes[0]?.value?.messages[0].button.payload;
+
+        const newStatus = first(buttonPayload.split(":"));
+
+        const type = body.entry[0].changes[0].value.messages[0].type;
+        if (type === "button") {
+          if (!reminder_reply_status) {
+            changeReminderStatus({
+              message_id,
+              appointment_id,
+              reminderStatusReference,
+              newStatus,
+            });
+            changeReminderReplyStatus(conversationId);
+          }
+        }
         console.log("reminderStatusReference", reminderStatusReference);
         console.log("appointment_id", appointment_id);
       }
@@ -119,6 +201,13 @@ app.post("/webhook", (req, res) => {
       console.error(error);
     }
   };
+  const isMessageStatus = !!req.body.entry[0].changes[0].value?.statuses;
+  console.log("isMessageStatus", isMessageStatus);
+
+  if (isMessageStatus) {
+    const message_id = req.body.entry[0].changes[0].value?.statuses[0].id;
+    getConversationByMessageId(message_id);
+  }
 
   if (req.body.object) {
     console.log("is an object");
@@ -129,18 +218,14 @@ app.post("/webhook", (req, res) => {
       body.entry[0].changes[0].value.messages[0].context &&
       body.entry[0].changes[0].value.messages[0].context.id
     ) {
-      const type = body.entry[0].changes[0].value.messages[0].type;
-      if (type === "button") {
-        const message_id =
-          body.entry[0].changes[0].value.messages[0].context.id;
-        console.log(
-          "message as a response to init message in database",
-          message_id
-        );
+      const message_id = body.entry[0].changes[0].value.messages[0].context.id;
+      console.log(
+        "message as a response to init message in database",
+        message_id
+      );
 
-        console.log("button quick reply");
-        getConversationByMessageId(message_id);
-      }
+      console.log("button quick reply");
+      getConversationByMessageId(message_id);
     }
   }
 
