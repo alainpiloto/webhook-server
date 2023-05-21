@@ -7,7 +7,9 @@
 
 "use strict";
 
+const { get, isEmpty } = require("lodash");
 const first = require("lodash/first");
+require("dotenv").config();
 
 // require axios for making http requests
 
@@ -15,9 +17,7 @@ const first = require("lodash/first");
 // (copy token from DevX getting started page
 // and save it as environment variable into the .env file)
 // const token = process.env.WHATSAPP_TOKEN;
-const token =
-  "EAANHOOT6xKYBABkwbURjdszYckZAa8N3SGnbXsqYNK9s8HcvpfbjMvbCu410170q0HjbNWO9gOVREi17NFOSCJyVLGp2ZAbeIDTcxOCVRFZBbKTRZA7XZAAdgOWMTz0C96FYkb9ZAXRGSzZBBqBGND9Hgsz9Iw5xHWikCSG05N7vPsGjsqQbzeu1HAg5uzY1NSsdQOSlehbIQZDZD";
-
+const token = process.env.WHATSAPP_TOKEN;
 // Imports dependencies and set up http server
 const request = require("request"),
   express = require("express"),
@@ -26,7 +26,10 @@ const request = require("request"),
   app = express().use(body_parser.json()); // creates express http server
 
 // Sets server port and logs message on success
-app.listen(process.env.PORT || 1339, () => console.log("webhook is listening"));
+
+const PORT = process.env.PORT || 1339;
+
+app.listen(PORT, () => console.log("webhook is listening", PORT));
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -42,25 +45,18 @@ const strapiUrl = axios.create({
       "e474145b413004a5480039e56b3544a1a06881264788a7adf18994891babcf4637e4d7be3cfb11be06023797ec191928758dcc254b0ef0f8572b5253a1bbe8c986efe93fe528e6472676d14dca168e7f5a0c9f265e7248b0a160748701877039380e836c556e8634d59471d08f608a74622a10292a315cdc7532822d37d12517",
   },
 });
-
-console.log("strapiUrl", strapiUrl);
-
 // Accepts POST requests at /webhook endpoint
 app.post("/webhook", (req, res) => {
   // Parse the request body from the POST
   let body = req.body;
   console.log(JSON.stringify(req.body, null, 2));
 
-  const changeReminderStatus = async (params) => {
-    const {
-      message_id,
-      appointment_id,
-      reminderStatusReference = [],
-      newStatus,
-    } = params;
+  const changeConversationReplyStatus = async (params) => {
+    const { message_id, conversationId, replyStatusReference, newStatus } =
+      params;
 
     const reminderStatusUpdated = [
-      ...reminderStatusReference,
+      ...replyStatusReference,
       {
         createdAt: new Date(),
         fromStatus: "notSentYet",
@@ -70,7 +66,7 @@ app.post("/webhook", (req, res) => {
     try {
       const response = await axios({
         method: "PUT",
-        url: `http://localhost:1337/api/appointments/${appointment_id}`,
+        url: `http://localhost:1337/api/conversations/${conversationId}`,
         headers: {
           "Content-Type": "application/json",
           Authorization:
@@ -79,7 +75,7 @@ app.post("/webhook", (req, res) => {
         },
         data: {
           data: {
-            reminderStatus: JSON.stringify(reminderStatusUpdated),
+            reminder_reply_status: JSON.stringify(reminderStatusUpdated),
           },
         },
       });
@@ -134,22 +130,16 @@ app.post("/webhook", (req, res) => {
 
       console.log("conversation data", response.data);
       console.log("message_id from get", message_id);
+
       if (response.data?.data.length > 0) {
         console.log("conversation data inside", response.data.data[0]);
         const conversationId = response.data.data[0].id;
+        console.log("conversationId", conversationId);
 
-        const appointment_id =
-          response.data.data[0].attributes.appointment.data.id;
+        const replyStatusReference =
+          response.data.data[0].attributes.reminder_reply_status;
 
-        const reminderStatusReference =
-          response.data.data[0].attributes.appointment.data.attributes
-            .reminderStatus;
-
-        const reminder_reply_status =
-          response.data.data[0].attributes.reminder_reply_status?.replied ??
-          false;
-
-        console.log("reminder_reply_status", reminder_reply_status);
+        console.log("reminder_reply_status", replyStatusReference);
 
         console.log("before setting MessageStatus");
         const isMessageStatus = !!req.body.entry[0].changes[0].value?.statuses;
@@ -159,18 +149,22 @@ app.post("/webhook", (req, res) => {
 
           console.log("messageStatus", messageStatus);
           if (messageStatus === "delivered") {
-            changeReminderStatus({
+            changeConversationReplyStatus({
               message_id,
-              appointment_id,
-              reminderStatusReference,
+              conversationId,
+              replyStatusReference: replyStatusReference
+                ? replyStatusReference
+                : [],
               newStatus: "sent",
             });
           }
           if (messageStatus === "read") {
-            changeReminderStatus({
+            changeConversationReplyStatus({
               message_id,
-              appointment_id,
-              reminderStatusReference,
+              conversationId,
+              replyStatusReference: replyStatusReference
+                ? replyStatusReference
+                : [],
               newStatus: "read",
             });
             return;
@@ -184,18 +178,18 @@ app.post("/webhook", (req, res) => {
 
         const type = body.entry[0].changes[0].value.messages[0].type;
         if (type === "button") {
-          if (!reminder_reply_status) {
-            changeReminderStatus({
+          if (!isEmpty(replyStatusReference)) {
+            changeConversationReplyStatus({
               message_id,
-              appointment_id,
-              reminderStatusReference,
+              conversationId,
+              replyStatusReference,
               newStatus,
             });
-            changeReminderReplyStatus(conversationId);
+            // changeReminderReplyStatus(conversationId);
           }
         }
-        console.log("reminderStatusReference", reminderStatusReference);
-        console.log("appointment_id", appointment_id);
+        console.log("replyStatusReference", replyStatusReference);
+        // // console.log("appointment_id", event_id);
       }
     } catch (error) {
       console.error(error);
