@@ -167,6 +167,7 @@ app.post("/webhook", (req, res) => {
 
         console.log("before setting MessageStatus");
         const isMessageStatus = !!req.body.entry[0].changes[0].value?.statuses;
+        console.log("isMessageStatus", isMessageStatus);
         if (isMessageStatus) {
           const messageStatus =
             req.body.entry[0].changes[0].value?.statuses[0].status;
@@ -183,6 +184,7 @@ app.post("/webhook", (req, res) => {
             });
           }
           if (messageStatus === "read") {
+            console.log("read!!! @@@");
             changeConversationReplyStatus({
               message_id,
               conversationId,
@@ -195,12 +197,12 @@ app.post("/webhook", (req, res) => {
           }
         }
 
-        const buttonPayload =
-          req.body.entry[0].changes[0]?.value?.messages[0].button.payload;
-
+        const buttonPayload = get(messages, "[0].button.payload", null);
+        console.log("buttonPayload 200", buttonPayload);
         const newStatus = first(buttonPayload.split(":"));
 
-        const type = body.entry[0].changes[0].value.messages[0].type;
+        const type = get(messages, "[0].type", null);
+        console.log("replyStatusReference", replyStatusReference);
         if (type === "button") {
           if (!isEmpty(replyStatusReference)) {
             changeConversationReplyStatus({
@@ -229,7 +231,10 @@ app.post("/webhook", (req, res) => {
 
   if (object) {
     console.log("is an object");
+    console.log("context 234", context);
     if (context?.id) {
+      console.log("context.id", context.id);
+
       const message_id = context.id;
       console.log(
         "message as a response to init message in database",
@@ -255,7 +260,7 @@ app.post("/webhook", (req, res) => {
       let phone_number_id =
         req.body.entry[0].changes[0].value.metadata.phone_number_id;
       let from = req.body.entry[0].changes[0].value.messages[0].from; // extract the phone number from the webhook payload
-      let msg_body = req.body.entry[0].changes[0].value.messages[0].text.body; // extract the message text from the webhook payload
+      let msg_body = messages[0].text?.body ?? ""; // extract the message text from the webhook payload
       axios({
         method: "POST", // Required, HTTP method, a string, e.g. POST, GET
         url:

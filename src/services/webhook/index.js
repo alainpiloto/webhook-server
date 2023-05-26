@@ -26,6 +26,7 @@ const getEventItems = (body) => {
     contacts,
     messages,
     field,
+    context,
   };
 };
 
