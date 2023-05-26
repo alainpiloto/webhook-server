@@ -8,6 +8,7 @@
 "use strict";
 
 const { get, isEmpty } = require("lodash");
+
 const first = require("lodash/first");
 require("dotenv").config();
 
@@ -19,11 +20,13 @@ require("dotenv").config();
 // const token = process.env.WHATSAPP_TOKEN;
 const token = process.env.WHATSAPP_TOKEN;
 // Imports dependencies and set up http server
-const request = require("request"),
-  express = require("express"),
-  body_parser = require("body-parser"),
-  axios = require("axios").default,
-  app = express().use(body_parser.json()); // creates express http server
+const request = require("request");
+const v1Router = require("./v1/routes");
+const express = require("express");
+const body_parser = require("body-parser");
+const { getMessageType, getEventItems } = require("./services/webhook");
+const axios = require("axios").default;
+const app = express().use(body_parser.json()); // creates express http server
 
 // Sets server port and logs message on success
 
@@ -31,9 +34,7 @@ const PORT = process.env.PORT || 1339;
 
 app.listen(PORT, () => console.log("webhook is listening", PORT));
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
+app.use("/api/v1", v1Router);
 
 const strapiUrl = axios.create({
   // baseURL: "https://dentaflowstrapi.up.railway.app/",
@@ -49,6 +50,29 @@ const strapiUrl = axios.create({
 app.post("/webhook", (req, res) => {
   // Parse the request body from the POST
   let body = req.body;
+  const {
+    object,
+    changes,
+    entry,
+    id,
+    value,
+    statuses,
+    contacts,
+    messages,
+    context,
+    field,
+  } = getEventItems(body);
+  console.log("object", object);
+  console.log("entry", entry);
+  console.log("id", id);
+  console.log("changes", changes);
+  console.log("value", value);
+  console.log("statuses", statuses);
+  console.log("contacts", contacts);
+  console.log("messages", messages);
+  console.log("field", field);
+  console.log("body", JSON.stringify(body));
+
   console.log(JSON.stringify(req.body, null, 2));
 
   const changeConversationReplyStatus = async (params) => {
@@ -203,16 +227,10 @@ app.post("/webhook", (req, res) => {
     getConversationByMessageId(message_id);
   }
 
-  if (req.body.object) {
+  if (object) {
     console.log("is an object");
-    if (
-      body.entry[0].changes[0].value &&
-      body.entry[0].changes[0].value.messages &&
-      body.entry[0].changes[0].value.messages[0] &&
-      body.entry[0].changes[0].value.messages[0].context &&
-      body.entry[0].changes[0].value.messages[0].context.id
-    ) {
-      const message_id = body.entry[0].changes[0].value.messages[0].context.id;
+    if (context?.id) {
+      const message_id = context.id;
       console.log(
         "message as a response to init message in database",
         message_id
