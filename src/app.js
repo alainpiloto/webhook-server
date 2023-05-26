@@ -24,7 +24,7 @@ const request = require("request");
 const v1Router = require("./v1/routes");
 const express = require("express");
 const body_parser = require("body-parser");
-const { getMessageType, getEventItems } = require("./services/webhook");
+const { getEventItems } = require("./utils");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
 
