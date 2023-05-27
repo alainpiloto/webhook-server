@@ -1,12 +1,10 @@
 const { strapi } = require("../axiosInstances");
 
-const updateConversation = async (params) => {
+const updateConversation = async (conversationId, params) => {
   try {
-    const response = await strapi.put(`pi/conversations/${conversationId}`, {
+    const response = await strapi.put(`api/conversations/${conversationId}`, {
       data: {
-        data: {
-          ...params,
-        },
+        ...params,
       },
     });
     console.log("response of updateConversation", response.data);
@@ -16,6 +14,18 @@ const updateConversation = async (params) => {
   }
 };
 
+const getConversationByMessageId = async (message_id) => {
+  try {
+    const response = await strapi(
+      `api/conversations?populate=*&filters[init_message_id]=${message_id}`
+    );
+    return response;
+  } catch (error) {
+    console.error("error", error);
+  }
+};
+
 module.exports = {
   updateConversation,
+  getConversationByMessageId,
 };

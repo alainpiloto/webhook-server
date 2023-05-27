@@ -1,8 +1,7 @@
 const { updateConversation } = require("../../APIServices/conversations");
 
-const changeConversationReplyStatus = async (params) => {
-  const { message_id, conversationId, replyStatusReference, newStatus } =
-    params;
+const changeConversationReplyStatus = async (data) => {
+  const { message_id, conversationId, replyStatusReference, newStatus } = data;
 
   const reminderStatusUpdated = [
     ...replyStatusReference,
@@ -17,7 +16,7 @@ const changeConversationReplyStatus = async (params) => {
     reminder_reply_status: JSON.stringify(reminderStatusUpdated),
   };
 
-  const response = await updateConversation(params);
+  const response = await updateConversation(conversationId, params);
 };
 
 module.exports = {

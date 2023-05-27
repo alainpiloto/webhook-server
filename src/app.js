@@ -24,8 +24,9 @@ const request = require("request");
 const v1Router = require("./v1/routes");
 const express = require("express");
 const body_parser = require("body-parser");
-const { getEventItems } = require("./utils");
+const { getEventItems, getNewStatus } = require("./utils");
 const { strapi } = require("./axiosInstances");
+const { changeConversationReplyStatus } = require("./services/conversations");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
 
@@ -65,34 +66,6 @@ app.post("/webhook", (req, res) => {
   console.log("body", JSON.stringify(body));
 
   console.log(JSON.stringify(req.body, null, 2));
-
-  const changeConversationReplyStatus = async (params) => {
-    const { message_id, conversationId, replyStatusReference, newStatus } =
-      params;
-
-    const reminderStatusUpdated = [
-      ...replyStatusReference,
-      {
-        createdAt: new Date(),
-        fromStatus: "notSentYet",
-        statusName: newStatus,
-      },
-    ];
-    console.log("reminderStatusUpdated", reminderStatusUpdated);
-    try {
-      const response = await strapi.put(`api/conversations/${conversationId}`, {
-        data: {
-          reminder_reply_status: reminderStatusUpdated,
-        },
-      });
-      console.log(
-        "response of put changeConversationReplyStatus",
-        response.data
-      );
-    } catch (error) {
-      console.error("error", error);
-    }
-  };
 
   const changeReminderReplyStatus = async (conversationId) => {
     console.log("conversationId", conversationId);
@@ -147,53 +120,18 @@ app.post("/webhook", (req, res) => {
         console.log("reminder_reply_status", replyStatusReference);
 
         console.log("before setting MessageStatus");
-        const isMessageStatus = !isEmpty(statuses);
-        console.log("isMessageStatus", isMessageStatus);
-        if (isMessageStatus) {
-          const messageStatus = get(statuses, "[0].status", []);
 
-          console.log("messageStatus", messageStatus);
-          if (messageStatus === "delivered") {
-            changeConversationReplyStatus({
-              message_id,
-              conversationId,
-              replyStatusReference: replyStatusReference
-                ? replyStatusReference
-                : [],
-              newStatus: "sent",
-            });
-          }
-          if (messageStatus === "read") {
-            console.log("read!!! @@@");
-            changeConversationReplyStatus({
-              message_id,
-              conversationId,
-              replyStatusReference: replyStatusReference
-                ? replyStatusReference
-                : [],
-              newStatus: "read",
-            });
-            return;
-          }
-        }
+        const newStatus = getNewStatus(body);
 
-        const buttonPayload = get(messages, "[0].button.payload", null);
-        console.log("buttonPayload 200", buttonPayload);
-        const newStatus = first(buttonPayload?.split(":"));
+        changeConversationReplyStatus({
+          message_id,
+          conversationId,
+          replyStatusReference: replyStatusReference
+            ? replyStatusReference
+            : [],
+          newStatus,
+        });
 
-        const type = get(messages, "[0].type", null);
-        console.log("replyStatusReference", replyStatusReference);
-        if (type === "button") {
-          if (!isEmpty(replyStatusReference)) {
-            changeConversationReplyStatus({
-              message_id,
-              conversationId,
-              replyStatusReference,
-              newStatus,
-            });
-            // changeReminderReplyStatus(conversationId);
-          }
-        }
         console.log("replyStatusReference", replyStatusReference);
         // // console.log("appointment_id", event_id);
       }

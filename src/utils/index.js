@@ -1,4 +1,4 @@
-const { get } = require("lodash");
+const { get, isEmpty, first } = require("lodash");
 
 const getEventItems = (body) => {
   console.log("body from getMessageType", JSON.stringify(body, null, 2));
@@ -30,9 +30,47 @@ const getEventItems = (body) => {
   };
 };
 
-//   if( )
-// };
+const getEventType = (body) => {
+  const { value, statuses } = getEventItems(body);
+  let type = null;
+  const button = get(messages, "[0].button", {});
+
+  if (!isEmpty(statuses)) {
+    type = "status";
+  }
+  if (!isEmpty(button)) {
+    type = "quickReply";
+  }
+
+  return type;
+};
+
+const getNewStatus = (body) => {
+  const { statuses, messages } = getEventItems(body);
+
+  let newStatus = null;
+
+  if (!isEmpty(statuses)) {
+    const status = get(statuses, "[0].status", []);
+    if (status === "delivered") {
+      newStatus = "sent";
+    }
+    if (status === "read") {
+      newStatus = "read";
+    }
+    return newStatus;
+  }
+
+  if (!isEmpty(messages)) {
+    const buttonPayload = get(messages, "[0].button.payload", null);
+    console.log("buttonPayload 200", buttonPayload);
+    newStatus = first(buttonPayload?.split(":"));
+    return newStatus;
+  }
+};
 
 module.exports = {
   getEventItems,
+  getEventType,
+  getNewStatus,
 };
