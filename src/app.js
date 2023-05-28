@@ -7,9 +7,8 @@
 
 "use strict";
 
-const { get, isEmpty } = require("lodash");
+const { get } = require("lodash");
 
-const first = require("lodash/first");
 require("dotenv").config();
 
 // require axios for making http requests
@@ -17,15 +16,12 @@ require("dotenv").config();
 // Access token for your app
 // (copy token from DevX getting started page
 // and save it as environment variable into the .env file)
-// const token = process.env.WHATSAPP_TOKEN;
 const token = process.env.WHATSAPP_TOKEN;
 // Imports dependencies and set up http server
-const request = require("request");
 const v1Router = require("./v1/routes");
 const express = require("express");
 const body_parser = require("body-parser");
-const { getEventItems, getNewStatus } = require("./utils");
-const { strapi } = require("./axiosInstances");
+const { getEventItems } = require("./utils");
 const { changeConversationReplyStatus } = require("./services/conversations");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
@@ -42,28 +38,7 @@ app.use("/api/v1", v1Router);
 app.post("/webhook", (req, res) => {
   // Parse the request body from the POST
   let body = req.body;
-  const {
-    object,
-    changes,
-    entry,
-    id,
-    value,
-    statuses,
-    contacts,
-    messages,
-    context,
-    field,
-  } = getEventItems(body);
-  console.log("object", object);
-  console.log("entry", entry);
-  console.log("id", id);
-  console.log("changes", changes);
-  console.log("value", value);
-  console.log("statuses", statuses);
-  console.log("contacts", contacts);
-  console.log("messages", messages);
-  console.log("field", field);
-  console.log("body", JSON.stringify(body));
+  const { changes, id, messages } = getEventItems(body);
 
   console.log(JSON.stringify(req.body, null, 2));
 
@@ -97,72 +72,7 @@ app.post("/webhook", (req, res) => {
     }
   };
 
-  const getConversationByMessageId = async (message_id) => {
-    try {
-      const response = await strapi(
-        `api/conversations?populate=*&filters[init_message_id]=${message_id}`
-      );
-
-      console.log("conversation data", response.data);
-      console.log("message_id from get", message_id);
-
-      if (response?.data?.data?.length > 0) {
-        console.log("conversation data inside", response.data.data[0]);
-        const conversationId = response.data.data[0].id;
-        console.log("conversationId", conversationId);
-
-        const replyStatusReference = get(
-          response,
-          "data.data[0].attributes.reminder_reply_status",
-          []
-        );
-
-        console.log("reminder_reply_status", replyStatusReference);
-
-        console.log("before setting MessageStatus");
-
-        const newStatus = getNewStatus(body);
-
-        changeConversationReplyStatus({
-          message_id,
-          conversationId,
-          replyStatusReference: replyStatusReference
-            ? replyStatusReference
-            : [],
-          newStatus,
-        });
-
-        console.log("replyStatusReference", replyStatusReference);
-        // // console.log("appointment_id", event_id);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-  const isMessageStatus = !isEmpty(statuses);
-  console.log("isMessageStatus", isMessageStatus);
-
-  if (isMessageStatus) {
-    const message_id = get(statuses, "[0].id", null);
-    getConversationByMessageId(message_id);
-  }
-
-  if (object) {
-    console.log("is an object");
-    console.log("context 234", context);
-    if (context?.id) {
-      console.log("context.id", context.id);
-
-      const message_id = context.id;
-      console.log(
-        "message as a response to init message in database",
-        message_id
-      );
-
-      console.log("button quick reply");
-      getConversationByMessageId(message_id);
-    }
-  }
+  changeConversationReplyStatus(body);
 
   // Check the Incoming webhook message
 

@@ -16,10 +16,10 @@ const updateConversation = async (conversationId, params) => {
 
 const getConversationByMessageId = async (message_id) => {
   try {
-    const response = await strapi(
+    const response = await strapi.get(
       `api/conversations?populate=*&filters[init_message_id]=${message_id}`
     );
-    return response;
+    return response.data;
   } catch (error) {
     console.error("error", error);
   }
