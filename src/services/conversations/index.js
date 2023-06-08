@@ -34,7 +34,7 @@ const changeConversationReplyStatus = async (body) => {
 
   const conversationResponse = await getConversationByMessageId(message_id);
   console.log("conversationResponse 36", conversationResponse);
-  console.log("conversation data", conversationResponse.data);
+  console.log("conversation data", conversationResponse?.data);
   console.log("message_id from get", message_id);
 
   if (conversationResponse?.data?.length > 0) {
