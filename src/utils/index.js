@@ -58,7 +58,6 @@ const getNewStatus = (body) => {
     if (status === "read") {
       newStatus = "read";
     }
-    console.log("newStatus line 61", newStatus);
     return newStatus;
   }
 
@@ -66,11 +65,8 @@ const getNewStatus = (body) => {
     const buttonPayload = get(messages, "[0].button.payload", null);
     console.log("buttonPayload 200", buttonPayload);
     newStatus = first(buttonPayload?.split(":"));
-    console.log("newStatus line 69", newStatus);
     return newStatus;
   }
-  console.log("newStatus line 70 ", newStatus);
-  return newStatus;
 };
 
 module.exports = {
