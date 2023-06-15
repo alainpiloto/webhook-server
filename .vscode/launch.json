@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "type": "node",
+      "name": "launch webhook server",
+      "request": "launch",
+      "program": "${workspaceFolder}/app.js"
+    }
+  ]
+}

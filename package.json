@@ -4,17 +4,25 @@
   "description": "An example webhook for WhatsApp Cloud API quick start tutorial.",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node src/app.js",
+    "dev": "node --inpect src/app.js",
+    "nodemon": "nodemon --inspect src/app.js"
   },
   "author": "WhatsApp",
   "license": "ISC",
   "dependencies": {
     "axios": "^0.27.2",
     "body-parser": "^1.20.0",
+    "dotenv": "^16.0.3",
     "express": "^4.18.1",
+    "googleapis": "^118.0.0",
+    "lodash": "^4.17.21",
     "request": "^2.88.2"
   },
   "engines": {
     "node": "12.x"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
   }
 }
