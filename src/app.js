@@ -171,16 +171,63 @@ app.post("/webhook", (req, res) => {
     if (messages[0]) {
       let phone_number_id = changes[0].value.metadata.phone_number_id;
       let from = messages[0].from; // extract the phone number from the webhook payload
-      let msg_body = get(
-        messages,
-        "[0].text.body",
-        get(messages, "[0].button.text")
-      ); // extract the message text from the webhook payload
-      // let msg_body = req.body.entry[0].changes[0].value.messages[0].text.body;
+      const buttonQuickReply = get(messages, "[0].button", null);
+      // logic for quick reply buttons
+      let msg_body = "";
+      if (buttonQuickReply) {
+        console.log("button quick reply");
+        const response = first(buttonQuickReply.payload.split(":"));
+        console.log("response", response);
+        if (response === "attend") {
+          msg_body = "¡Gracias por confirmar tu cita!";
+        }
+        if (response === "cancel") {
+          msg_body = "¡Gracias por notificarnos!";
+        }
+        if (response === "reschedule") {
+          axios({
+            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+            url:
+              "https://graph.facebook.com/v17.0/" +
+              phone_number_id +
+              "/messages?access_token=" +
+              token,
+            data: {
+              to: from,
+              messaging_product: "whatsapp",
+              type: "contacts",
+              contacts: [
+                {
+                  name: {
+                    first_name: "Alain",
+                    formatted_name: "Alain Piloto",
+                    last_name: "Piloto",
+                  },
+                  phones: [
+                    {
+                      wa_id: "593993950137",
+                      type: "WORK",
+                    },
+                  ],
+                },
+              ],
+            },
+            headers: { "Content-Type": "application/json" },
+          }).catch((error) => {
+            console.log("error sending contact", error);
+          });
+          res.sendStatus(200);
+          return;
+        }
+      } else {
+        console.log("text message");
+        msg_body = messages[0].text.body; // extract the message text from the webhook payload
+      }
+
       axios({
         method: "POST", // Required, HTTP method, a string, e.g. POST, GET
         url:
-          "https://graph.facebook.com/v12.0/" +
+          "https://graph.facebook.com/v17.0/" +
           phone_number_id +
           "/messages?access_token=" +
           token,
