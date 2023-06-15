@@ -77,7 +77,7 @@ app.post("/webhook", (req, res) => {
     try {
       const response = await axios({
         method: "PUT",
-        url: `http://localhost:1337/api/conversations/${conversationId}`,
+        url: `${process.env.STRAPI_URL}/api/conversations/${conversationId}`,
         headers: {
           "Content-Type": "application/json",
           Authorization:
