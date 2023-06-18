@@ -27,6 +27,7 @@ const body_parser = require("body-parser");
 const { getEventItems, getNewStatus } = require("./utils");
 const { strapi } = require("./axiosInstances");
 const { changeConversationReplyStatus } = require("./services/conversations");
+const { getConversationByMessageId } = require("./APIServices/conversations");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
 
@@ -39,7 +40,7 @@ app.listen(PORT, () => console.log("webhook is listening", PORT));
 app.use("/api/v1", v1Router);
 
 // Accepts POST requests at /webhook endpoint
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async (req, res) => {
   // Parse the request body from the POST
   let body = req.body;
   const {
@@ -97,11 +98,9 @@ app.post("/webhook", (req, res) => {
     }
   };
 
-  const getConversationByMessageId = async (message_id) => {
+  const handleConversationByMessageId = async (message_id) => {
     try {
-      const response = await strapi(
-        `api/conversations?populate=*&filters[init_message_id]=${message_id}`
-      );
+      const response = await getConversationByMessageId(message_id);
 
       console.log("conversation data", response.data);
       console.log("message_id from get", message_id);
@@ -144,7 +143,7 @@ app.post("/webhook", (req, res) => {
 
   if (isMessageStatus) {
     const message_id = get(statuses, "[0].id", null);
-    getConversationByMessageId(message_id);
+    handleConversationByMessageId(message_id);
   }
 
   if (object) {
@@ -160,7 +159,7 @@ app.post("/webhook", (req, res) => {
       );
 
       console.log("button quick reply");
-      getConversationByMessageId(message_id);
+      handleConversationByMessageId(message_id);
     }
   }
 
@@ -172,6 +171,7 @@ app.post("/webhook", (req, res) => {
       let phone_number_id = changes[0].value.metadata.phone_number_id;
       let from = messages[0].from; // extract the phone number from the webhook payload
       const buttonQuickReply = get(messages, "[0].button", null);
+      const contextMessageId = get(messages, "[0].context.id", null);
       // logic for quick reply buttons
       let msg_body = "";
       if (buttonQuickReply) {
@@ -185,43 +185,59 @@ app.post("/webhook", (req, res) => {
           msg_body = "¡Gracias por notificarnos!";
         }
         if (response === "reschedule") {
-          axios({
-            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-            url:
-              "https://graph.facebook.com/v17.0/" +
-              phone_number_id +
-              "/messages?access_token=" +
-              token,
-            data: {
-              to: from,
-              messaging_product: "whatsapp",
-              type: "contacts",
-              contacts: [
-                {
-                  name: {
-                    first_name: "Alain",
-                    formatted_name: "Alain Piloto",
-                    last_name: "Piloto",
-                  },
-                  phones: [
-                    {
-                      wa_id: "593993950137",
-                      type: "WORK",
+          try {
+            const response = await getConversationByMessageId(contextMessageId);
+            const conversation = get(response, "data.data[0].attributes", null);
+            console.log("conversation", conversation);
+            const userRemindersConfig = get(
+              conversation,
+              "user.data.attributes.remindersConfig",
+              null
+            );
+            console.log("userConfig", userRemindersConfig);
+            const contactName = get(userRemindersConfig, "wsContactName", null);
+            console.log("contactName", contactName);
+            axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v17.0/" +
+                phone_number_id +
+                "/messages?access_token=" +
+                token,
+              data: {
+                to: from,
+                messaging_product: "whatsapp",
+                type: "contacts",
+                contacts: [
+                  {
+                    name: {
+                      first_name: contactName,
+                      formatted_name: contactName,
                     },
-                  ],
-                },
-              ],
-            },
-            headers: { "Content-Type": "application/json" },
-          }).catch((error) => {
-            console.log("error sending contact", error);
-          });
+                    phones: [
+                      {
+                        wa_id: "593993950137",
+                        type: "WORK",
+                      },
+                    ],
+                  },
+                ],
+              },
+              headers: { "Content-Type": "application/json" },
+            }).catch((error) => {
+              console.log("error sending contact", error);
+            });
+          } catch (error) {
+            console.error("error getting conversation", error);
+            return;
+          }
+
           res.sendStatus(200);
           return;
         }
       } else {
         console.log("text message");
-        msg_body = messages[0].text.body; // extract the message text from the webhook payload
+        msg_body = messages[0]?.text?.body; // extract the message text from the webhook payload
       }
 
       axios({
@@ -234,7 +250,7 @@ app.post("/webhook", (req, res) => {
         data: {
           messaging_product: "whatsapp",
           to: from,
-          text: { body: "Ack: " + msg_body },
+          text: { body: msg_body },
         },
         headers: { "Content-Type": "application/json" },
       });
