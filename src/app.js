@@ -237,7 +237,7 @@ app.post("/webhook", async (req, res) => {
         }
       } else {
         console.log("text message");
-        msg_body = messages[0].text.body; // extract the message text from the webhook payload
+        msg_body = messages[0]?.text?.body; // extract the message text from the webhook payload
       }
 
       axios({
