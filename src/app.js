@@ -176,7 +176,11 @@ app.post("/webhook", async (req, res) => {
       let msg_body = "";
       if (buttonQuickReply) {
         console.log("button quick reply");
-        const response = first(buttonQuickReply.payload.split(":"));
+
+        const payloadObject = JSON.parse(buttonQuickReply.payload);
+        const response = get(payloadObject, "response", null);
+        console.log("response", response);
+
         console.log("response", response);
         if (response === "attend") {
           msg_body = "¡Gracias por confirmar tu cita!";
