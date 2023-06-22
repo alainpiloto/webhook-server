@@ -2,8 +2,10 @@ const { googleAPI } = require("../../../http");
 
 const getEvent = async ({ eventId, calendarId }) => {
   try {
+    console.log("eventId", eventId);
+    console.log("calendarId", calendarId);
     const response = await googleAPI.get(
-      `calendars/${calendarId}/events/${eventId}`
+      `calendar/v3/calendars/${calendarId}/events/${eventId}`
     );
     return response;
   } catch (error) {
@@ -14,7 +16,7 @@ const getEvent = async ({ eventId, calendarId }) => {
 const updateEvent = async ({ eventId, calendarId, params }) => {
   try {
     const response = await googleAPI.put(
-      `calendars/${calendarId}/events/${eventId}`,
+      `calendar/v3/calendars/${calendarId}/events/${eventId}`,
       {
         ...params,
       }

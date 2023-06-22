@@ -64,7 +64,9 @@ const getNewStatus = (body) => {
   if (!isEmpty(messages)) {
     const buttonPayload = get(messages, "[0].button.payload", null);
     console.log("buttonPayload 200", buttonPayload);
-    newStatus = first(buttonPayload?.split(":"));
+    const payloadObject = JSON.parse(buttonPayload);
+    const clienTresponse = get(payloadObject, "response", null);
+    newStatus = clienTresponse;
     return newStatus;
   }
 };

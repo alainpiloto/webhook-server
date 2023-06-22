@@ -18,7 +18,7 @@ require("dotenv").config();
 // (copy token from DevX getting started page
 // and save it as environment variable into the .env file)
 // const token = process.env.WHATSAPP_TOKEN;
-const token = process.env.WHATSAPP_TOKEN;
+const WStoken = process.env.WHATSAPP_TOKEN;
 // Imports dependencies and set up http server
 const request = require("request");
 const v1Router = require("./v1/routes");
@@ -28,6 +28,8 @@ const { getEventItems, getNewStatus } = require("./utils");
 const { strapi } = require("./axiosInstances");
 const { changeConversationReplyStatus } = require("./services/conversations");
 const { getConversationByMessageId } = require("./APIServices/conversations");
+const { googleAPI } = require("../http");
+const { getEvent } = require("./APIServices/googleCalendar");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
 
@@ -177,64 +179,84 @@ app.post("/webhook", async (req, res) => {
       if (buttonQuickReply) {
         console.log("button quick reply");
 
-        const payloadObject = JSON.parse(buttonQuickReply.payload);
-        const response = get(payloadObject, "response", null);
-        console.log("response", response);
+        const payloadObject = JSON.parse(buttonQuickReply?.payload);
+        const clienTresponse = get(payloadObject, "response", null);
+        const eventId = get(payloadObject, "googleEventId", null);
+        const calendarId = get(payloadObject, "calendarId", null);
 
-        console.log("response", response);
-        if (response === "attend") {
+        const conversationData = await getConversationByMessageId(
+          contextMessageId
+        ).catch((error) => {
+          console.error("error getting conversation", error);
+        });
+
+        const conversation = get(
+          conversationData,
+          "data.data[0].attributes",
+          null
+        );
+
+        const token = get(conversation, "user.data.attributes.ggToken", null);
+
+        if (token) {
+          googleAPI.defaults.headers.common[
+            "Authorization"
+          ] = `Bearer ${token}`;
+          const event = await getEvent({ calendarId, eventId }).catch(
+            (error) => {
+              console.error("error getting event", error);
+            }
+          );
+          console.log("event", event);
+        }
+
+        if (clienTresponse === "attend") {
           msg_body = "¡Gracias por confirmar tu cita!";
         }
-        if (response === "cancel") {
+        if (clienTresponse === "cancel") {
           msg_body = "¡Gracias por notificarnos!";
         }
-        if (response === "reschedule") {
-          try {
-            const response = await getConversationByMessageId(contextMessageId);
-            const conversation = get(response, "data.data[0].attributes", null);
-            console.log("conversation", conversation);
-            const userRemindersConfig = get(
-              conversation,
-              "user.data.attributes.remindersConfig",
-              null
-            );
-            console.log("userConfig", userRemindersConfig);
-            const contactName = get(userRemindersConfig, "wsContactName", null);
-            console.log("contactName", contactName);
-            axios({
-              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-              url:
-                "https://graph.facebook.com/v17.0/" +
-                phone_number_id +
-                "/messages?access_token=" +
-                token,
-              data: {
-                to: from,
-                messaging_product: "whatsapp",
-                type: "contacts",
-                contacts: [
-                  {
-                    name: {
-                      first_name: contactName,
-                      formatted_name: contactName,
-                    },
-                    phones: [
-                      {
-                        wa_id: "593993950137",
-                        type: "WORK",
-                      },
-                    ],
+        if (clienTresponse === "reschedule") {
+          console.log("conversation", conversation);
+          const userRemindersConfig = get(
+            conversation,
+            "user.data.attributes.remindersConfig",
+            null
+          );
+
+          console.log("userConfig", userRemindersConfig);
+          const contactName = get(userRemindersConfig, "wsContactName", null);
+          console.log("contactName", contactName);
+          axios({
+            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+            url:
+              "https://graph.facebook.com/v17.0/" +
+              phone_number_id +
+              "/messages?access_token=" +
+              WStoken,
+            data: {
+              to: from,
+              messaging_product: "whatsapp",
+              type: "contacts",
+              contacts: [
+                {
+                  name: {
+                    first_name: contactName,
+                    formatted_name: contactName,
                   },
-                ],
-              },
-              headers: { "Content-Type": "application/json" },
-            }).catch((error) => {
-              console.log("error sending contact", error);
-            });
-          } catch (error) {
-            console.error("error getting conversation", error);
-            return;
-          }
+                  phones: [
+                    {
+                      wa_id: "593993950137",
+                      type: "WORK",
+                    },
+                  ],
+                },
+              ],
+            },
+            headers: { "Content-Type": "application/json" },
+          }).catch((error) => {
+            console.log("error sending contact", error);
+          });
 
           res.sendStatus(200);
           return;
@@ -250,7 +272,7 @@ app.post("/webhook", async (req, res) => {
           "https://graph.facebook.com/v17.0/" +
           phone_number_id +
           "/messages?access_token=" +
-          token,
+          WStoken,
         data: {
           messaging_product: "whatsapp",
           to: from,
