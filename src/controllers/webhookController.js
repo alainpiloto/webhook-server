@@ -2,7 +2,10 @@ const { default: axios } = require("axios");
 const { isEmpty, get } = require("lodash");
 const { googleAPI } = require("../../http");
 const { getConversationByMessageId } = require("../APIServices/conversations");
-const { getEvent, updateEvent } = require("../APIServices/googleCalendar");
+const {
+  updateEvent,
+  getEvent,
+} = require("../APIServices/google/googleCalendar");
 const { changeConversationReplyStatus } = require("../services/conversations");
 const { getNewStatus, parseEventTitle, getEventItems } = require("../utils");
 require("dotenv").config();

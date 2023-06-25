@@ -6,13 +6,15 @@ const express = require("express");
 const body_parser = require("body-parser");
 
 const app = express().use(body_parser.json()); // creates express http server
-
 const webhookRoutes = require("./routes/webhookRoutes");
 const webhookRouter = require("./routes/webhookRoutes");
+const refreshGoogleSession = require("./cronjobs/googleSession");
 
 const PORT = process.env.PORT || 1339;
 
 app.listen(PORT, () => console.log("webhook is listening", PORT));
+
+refreshGoogleSession();
 
 // app.use("/api/v1", v1Router);
 app.use(webhookRoutes, webhookRouter);
