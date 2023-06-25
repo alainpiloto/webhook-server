@@ -24,12 +24,12 @@ const request = require("request");
 const v1Router = require("./v1/routes");
 const express = require("express");
 const body_parser = require("body-parser");
-const { getEventItems, getNewStatus } = require("./utils");
+const { getEventItems, getNewStatus, parseEventTitle } = require("./utils");
 const { strapi } = require("./axiosInstances");
 const { changeConversationReplyStatus } = require("./services/conversations");
 const { getConversationByMessageId } = require("./APIServices/conversations");
 const { googleAPI } = require("../http");
-const { getEvent } = require("./APIServices/googleCalendar");
+const { getEvent, updateEvent } = require("./APIServices/googleCalendar");
 const axios = require("axios").default;
 const app = express().use(body_parser.json()); // creates express http server
 
@@ -180,10 +180,13 @@ app.post("/webhook", async (req, res) => {
         console.log("button quick reply");
 
         const payloadObject = JSON.parse(buttonQuickReply?.payload);
-        const clienTresponse = get(payloadObject, "response", null);
+        const clientResponse = get(payloadObject, "response", null);
         const eventId = get(payloadObject, "googleEventId", null);
         const calendarId = get(payloadObject, "calendarId", null);
-
+        console.log("eventId", eventId);
+        console.log("calendarId", calendarId);
+        console.log("clientResponse", clientResponse);
+        // get conversation by message id
         const conversationData = await getConversationByMessageId(
           contextMessageId
         ).catch((error) => {
@@ -197,7 +200,9 @@ app.post("/webhook", async (req, res) => {
         );
 
         const token = get(conversation, "user.data.attributes.ggToken", null);
-
+        let summaryReference;
+        let endReference;
+        let startReference;
         if (token) {
           googleAPI.defaults.headers.common[
             "Authorization"
@@ -207,16 +212,60 @@ app.post("/webhook", async (req, res) => {
               console.error("error getting event", error);
             }
           );
+          summaryReference = get(event, "data.summary", null);
+          endReference = get(event, "data.end", null);
+          startReference = get(event, "data.start", null);
+          console.log("summaryReference", summaryReference);
+          console.log("endReference", endReference);
+          console.log("startReference", startReference);
+
           console.log("event", event);
         }
 
-        if (clienTresponse === "attend") {
+        if (clientResponse === "attend") {
+          const response = await updateEvent({
+            calendarId,
+            eventId,
+            params: {
+              summary: parseEventTitle({
+                titleRef: summaryReference,
+                response: clientResponse,
+              }),
+            },
+          }).catch((error) => {
+            console.error("error updating event", error);
+          });
+          console.log("response from updating event", response);
           msg_body = "¡Gracias por confirmar tu cita!";
         }
-        if (clienTresponse === "cancel") {
+        if (clientResponse === "cancel") {
+          const response = await updateEvent({
+            calendarId,
+            eventId,
+            params: {
+              summary: parseEventTitle({
+                titleRef: summaryReference,
+                response: clientResponse,
+              }),
+            },
+          }).catch((error) => {
+            console.error("error updating event", error);
+          });
           msg_body = "¡Gracias por notificarnos!";
         }
-        if (clienTresponse === "reschedule") {
+        if (clientResponse === "reschedule") {
+          const response = await updateEvent({
+            calendarId,
+            eventId,
+            params: {
+              summary: parseEventTitle({
+                titleRef: summaryReference,
+                response: clientResponse,
+              }),
+            },
+          }).catch((error) => {
+            console.error("error updating event", error);
+          });
           console.log("conversation", conversation);
           const userRemindersConfig = get(
             conversation,

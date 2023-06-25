@@ -71,8 +71,28 @@ const getNewStatus = (body) => {
   }
 };
 
+const parseEventTitle = ({ titleRef, response }) => {
+  const responseColors = {
+    sent: "🟡",
+    attend: "🟢",
+    cancel: "🔴",
+    reschedule: "🟣",
+  };
+
+  const regex = /(🟡|🟣|🟢|🔴)/g;
+
+  const containsEmoticon = regex.test(titleRef);
+
+  if (!containsEmoticon) {
+    return `${responseColors[response]} ${titleRef}`;
+  } else {
+    return titleRef.replace(regex, responseColors[response]);
+  }
+};
+
 module.exports = {
   getEventItems,
   getEventType,
   getNewStatus,
+  parseEventTitle,
 };
