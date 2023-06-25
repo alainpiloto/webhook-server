@@ -1,8 +1,6 @@
 const { get, isEmpty, first } = require("lodash");
 
 const getEventItems = (body) => {
-  console.log("body from getMessageType", JSON.stringify(body, null, 2));
-
   const object = get(body, "object", "");
   const entry = get(body, "entry", []);
   const id = get(entry, "[0].id", "");
@@ -13,7 +11,6 @@ const getEventItems = (body) => {
   const messages = get(value, "messages", []);
   const field = get(changes, "field", "");
   const context = get(messages, "[0].context", {});
-  // console.logs of the above variables
 
   // return the above variables
   return {
@@ -63,7 +60,6 @@ const getNewStatus = (body) => {
 
   if (!isEmpty(messages)) {
     const buttonPayload = get(messages, "[0].button.payload", null);
-    console.log("buttonPayload 200", buttonPayload);
     const payloadObject = JSON.parse(buttonPayload);
     const clienTresponse = get(payloadObject, "response", null);
     newStatus = clienTresponse;

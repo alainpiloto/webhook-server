@@ -15,7 +15,6 @@ const updateConversation = async (conversationId, params) => {
 };
 
 const getConversationByMessageId = async (message_id) => {
-  console.log("message_id line18", message_id);
   try {
     const response = await strapi(
       `api/conversations?populate=*&filters[init_message_id]=${message_id}`
