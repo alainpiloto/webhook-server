@@ -163,21 +163,22 @@ async function webhookPostHandler(req, res) {
           });
           const user = await getUserByEventId(eventId);
           console.log("user in line 164 'getUserByEventID '", user);
-
+          const accessToken = get(user, "google_session.accessToken", null);
+          console.log("accessToken", accessToken);
           const conversation = get(
             conversationData,
             "data.data[0].attributes",
             null
           );
 
-          const token = get(conversation, "user.data.attributes.ggToken", null);
+          // const token = get(conversation, "user.data.attributes.ggToken", null);
           let summaryReference;
           let endReference;
           let startReference;
-          if (token) {
+          if (accessToken) {
             googleAPI.defaults.headers.common[
               "Authorization"
-            ] = `Bearer ${token}`;
+            ] = `Bearer ${accessToken}`;
             const event = await getEvent({ calendarId, eventId }).catch(
               (error) => {
                 console.error("error getting event", error);
