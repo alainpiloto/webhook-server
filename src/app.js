@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 1339;
 
 app.listen(PORT, () => console.log("webhook is listening", PORT));
 
-refreshGoogleSession();
+refreshGoogleSession(); // cronjob shceduled to run every minute to refresh google session
 
 // app.use("/api/v1", v1Router);
 app.use(webhookRoutes, webhookRouter);

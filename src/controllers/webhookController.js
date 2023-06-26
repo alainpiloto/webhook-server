@@ -6,6 +6,7 @@ const {
   updateEvent,
   getEvent,
 } = require("../APIServices/google/googleCalendar");
+const { getUserByEventId } = require("../database/services/user");
 const { changeConversationReplyStatus } = require("../services/conversations");
 const { getNewStatus, parseEventTitle, getEventItems } = require("../utils");
 require("dotenv").config();
@@ -145,6 +146,7 @@ async function webhookPostHandler(req, res) {
         const contextMessageId = get(messages, "[0].context.id", null);
         // logic for quick reply buttons
         let msg_body = "";
+
         if (buttonQuickReply) {
           const payloadObject = JSON.parse(buttonQuickReply?.payload);
           const clientResponse = get(payloadObject, "response", null);
@@ -159,6 +161,8 @@ async function webhookPostHandler(req, res) {
           ).catch((error) => {
             console.error("error getting conversation", error);
           });
+          const user = await getUserByEventId(eventId);
+          console.log("user in line 164 'getUserByEventID '", user);
 
           const conversation = get(
             conversationData,
