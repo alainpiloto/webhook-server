@@ -28,6 +28,7 @@ async function webhookGetHandler(req, res) {
   let challenge = req.query["hub.challenge"];
 
   // Check if a token and mode were sent
+
   if (mode && token) {
     // Check the mode and token sent are correct
     if (mode === "subscribe" && token === verify_token) {
@@ -39,7 +40,6 @@ async function webhookGetHandler(req, res) {
       res.sendStatus(403);
     }
   }
-  res.sendStatus(200);
 }
 
 // Controlador para la solicitud POST del webhook
@@ -162,9 +162,7 @@ async function webhookPostHandler(req, res) {
             console.error("error getting conversation", error);
           });
           const user = await getUserByEventId(eventId);
-          console.log("user in line 164 'getUserByEventID '", user);
           const accessToken = get(user, "google_session.accessToken", null);
-          console.log("accessToken", accessToken);
           const conversation = get(
             conversationData,
             "data.data[0].attributes",
@@ -173,8 +171,7 @@ async function webhookPostHandler(req, res) {
 
           // const token = get(conversation, "user.data.attributes.ggToken", null);
           let summaryReference;
-          let endReference;
-          let startReference;
+
           if (accessToken) {
             googleAPI.defaults.headers.common[
               "Authorization"
@@ -185,10 +182,6 @@ async function webhookPostHandler(req, res) {
               }
             );
             summaryReference = get(event, "data.summary", null);
-
-            console.log("summaryReference", summaryReference); // title of the event
-
-            console.log("event", event);
           }
 
           if (clientResponse === "attend") {
@@ -204,7 +197,6 @@ async function webhookPostHandler(req, res) {
             }).catch((error) => {
               console.error("error updating event", error);
             });
-            console.log("response from updating event", response);
             msg_body = "¡Gracias por confirmar tu cita!";
           }
           if (clientResponse === "cancel") {
@@ -273,12 +265,12 @@ async function webhookPostHandler(req, res) {
             }).catch((error) => {
               console.log("error sending contact", error);
             });
-
+            console.log("response sending 200");
             res.sendStatus(200);
             return;
           }
         } else {
-          console.log("text message");
+          console.log("text message line 273");
           msg_body = messages[0]?.text?.body; // extract the message text from the webhook payload
         }
 
@@ -301,12 +293,12 @@ async function webhookPostHandler(req, res) {
       // Return a '404 Not Found' if event is not from a WhatsApp API
       res.sendStatus(404);
     }
+    console.log("response sending 200");
+    res.sendStatus(200);
   } catch (error) {
     console.error(error);
     res.sendStatus(500); // Enviar una respuesta de error si ocurre alguna excepción
   }
-
-  res.sendStatus(200);
 }
 
 module.exports = {
