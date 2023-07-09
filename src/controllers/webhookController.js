@@ -162,9 +162,7 @@ async function webhookPostHandler(req, res) {
     // info on WhatsApp text message payload: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#text-messages
     if (req.body.object) {
       console.log("req.body.object", req.body.object);
-      console.log(statuses, "statuses");
-      // res.sendStatus(200);
-      // return;
+
       if (
         statuses &&
         statuses[0]?.status === "delivered" &&
@@ -178,7 +176,6 @@ async function webhookPostHandler(req, res) {
         });
 
         if (userData) {
-          console.log("userData ", userData);
           const { calendar_id: calendarId, event_id: eventId } =
             getConversationFromUser({
               user: userData,
@@ -187,7 +184,7 @@ async function webhookPostHandler(req, res) {
 
           const userId = get(userData, "id", null);
           const googleSession = get(userData, "google_session", null);
-          console.log("googleSession", googleSession);
+
           if (!isExpired(googleSession?.accessTokenExpires)) {
             const params = {
               userId,
@@ -202,9 +199,7 @@ async function webhookPostHandler(req, res) {
 
           // if access token is expired, refresh it
           if (isExpired(googleSession?.accessTokenExpires)) {
-            console.log("access token expired, refreshing it");
             const response = await refreshToken(googleSession?.refreshToken);
-            console.log("response", response);
             const accessTokenExpires = Date.now() + response?.expires_in * 1000;
 
             const params = {
@@ -230,7 +225,6 @@ async function webhookPostHandler(req, res) {
           return;
         }
       }
-      console.log("executing line 235");
       if (messages[0]) {
         let phone_number_id = changes[0].value.metadata.phone_number_id;
         let from = messages[0].from; // extract the phone number from the webhook payload
@@ -274,9 +268,7 @@ async function webhookPostHandler(req, res) {
               });
             }
             if (isExpired(googleSession?.accessTokenExpires)) {
-              console.log("access token expired, refreshing it");
               const response = await refreshToken(googleSession?.refreshToken);
-              console.log("response", response);
               const accessTokenExpires =
                 Date.now() + response?.expires_in * 1000;
 
@@ -300,7 +292,6 @@ async function webhookPostHandler(req, res) {
                   WStoken,
                   from,
                 });
-                console.log("msg_body", msg_body);
               } catch (error) {}
 
               // update user's google session with new access token

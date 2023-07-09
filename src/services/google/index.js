@@ -25,7 +25,6 @@ const handleUpdateEvent = async ({
 
   if (reminderStatus === "reschedule") {
     const conversation = get(conversationData, "data.data[0].attributes", null);
-    console.log("reschedule");
     const userRemindersConfig = get(
       conversation,
       "user.data.attributes.remindersConfig",
@@ -88,7 +87,6 @@ const handleUpdateEvent = async ({
     .catch((error) => {
       console.error("error updating event", error);
     });
-  console.log("message line 105 ", message);
   return message;
 };
 
