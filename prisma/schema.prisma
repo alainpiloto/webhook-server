@@ -301,6 +301,7 @@ model companies_users_links {
 
 model conversations {
   id                                                   Int                                @id @default(autoincrement()) @db.UnsignedInt
+  calendar_id                                          String?                            @db.VarChar(255)
   init_message_id                                      String?                            @db.VarChar(255)
   conversation_id                                      String?                            @db.VarChar(255)
   wa_id                                                String?                            @db.VarChar(255)

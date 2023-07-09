@@ -2,12 +2,18 @@ const { default: axios } = require("axios");
 const { isEmpty, get } = require("lodash");
 const { googleAPI } = require("../../http");
 const { getConversationByMessageId } = require("../APIServices/conversations");
+const { refreshToken } = require("../APIServices/google/googleAuth");
 const {
   updateEvent,
   getEvent,
 } = require("../APIServices/google/googleCalendar");
-const { getUserByEventId } = require("../database/services/user");
+const {
+  getUserByEventId,
+  getUserByMessageId,
+} = require("../database/services/user");
 const { changeConversationReplyStatus } = require("../services/conversations");
+const { handleUpdateEvent } = require("../services/google");
+const { updateGoogleSession } = require("../services/users");
 const { getNewStatus, parseEventTitle, getEventItems } = require("../utils");
 require("dotenv").config();
 const WStoken = process.env.WHATSAPP_TOKEN;
@@ -46,6 +52,7 @@ async function webhookGetHandler(req, res) {
 async function webhookPostHandler(req, res) {
   // Lógica para manejar la solicitud POST del webhook
   // ...
+
   try {
     // Parse the request body from the POST
     let body = req.body;
@@ -62,8 +69,23 @@ async function webhookPostHandler(req, res) {
       field,
     } = getEventItems(body);
 
-    console.log(JSON.stringify(req.body, null, 2));
+    const getConversationFromUser = ({ user, message_id }) => {
+      const userConversations = get(user, "conversations_user_links", []);
 
+      for (const obj of userConversations) {
+        if (obj.conversations.init_message_id === message_id) {
+          return obj.conversations;
+        }
+      }
+      return null;
+    };
+
+    console.log(JSON.stringify(req.body, null, 2));
+    const isExpired = (unixTimestamp) => {
+      const now = new Date();
+      const date = new Date(unixTimestamp * 1000);
+      return now > date;
+    };
     const changeReminderReplyStatus = async (conversationId) => {
       const payload = {
         replied: true,
@@ -139,6 +161,76 @@ async function webhookPostHandler(req, res) {
 
     // info on WhatsApp text message payload: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#text-messages
     if (req.body.object) {
+      console.log("req.body.object", req.body.object);
+      console.log(statuses, "statuses");
+      // res.sendStatus(200);
+      // return;
+      if (
+        statuses &&
+        statuses[0]?.status === "delivered" &&
+        statuses[0]?.conversation?.origin?.type === "utility"
+      ) {
+        const message_id = get(statuses, "[0].id", null);
+
+        // get user's google session by message id (init_message_id)
+        const userData = await getUserByMessageId(message_id).catch((error) => {
+          console.error("error getting user", error);
+        });
+
+        if (userData) {
+          console.log("userData ", userData);
+          const { calendar_id: calendarId, event_id: eventId } =
+            getConversationFromUser({
+              user: userData,
+              message_id,
+            });
+
+          const userId = get(userData, "id", null);
+          const googleSession = get(userData, "google_session", null);
+          console.log("googleSession", googleSession);
+          if (!isExpired(googleSession?.accessTokenExpires)) {
+            const params = {
+              userId,
+              eventId,
+              calendarId,
+              reminderStatus: "delivered",
+              accessTokenExpires: googleSession?.accessTokenExpires,
+              accessToken: googleSession?.accessToken,
+            };
+            await handleUpdateEvent({ params });
+          }
+
+          // if access token is expired, refresh it
+          if (isExpired(googleSession?.accessTokenExpires)) {
+            console.log("access token expired, refreshing it");
+            const response = await refreshToken(googleSession?.refreshToken);
+            console.log("response", response);
+            const accessTokenExpires = Date.now() + response?.expires_in * 1000;
+
+            const params = {
+              userId,
+              calendarId,
+              reminderStatus: "delivered",
+              googleSession: {
+                refreshToken:
+                  response?.refresh_token ??
+                  userData?.google_session?.refreshToken,
+                accessToken: response?.access_token,
+                accessTokenExpires,
+              },
+            };
+            //
+            await handleUpdateEvent({ params });
+
+            // update user's google session with new access token
+            await updateGoogleSession(params);
+          }
+        } else {
+          res.sendStatus(200);
+          return;
+        }
+      }
+      console.log("executing line 235");
       if (messages[0]) {
         let phone_number_id = changes[0].value.metadata.phone_number_id;
         let from = messages[0].from; // extract the phone number from the webhook payload
@@ -152,150 +244,97 @@ async function webhookPostHandler(req, res) {
           const clientResponse = get(payloadObject, "response", null);
           const eventId = get(payloadObject, "googleEventId", null);
           const calendarId = get(payloadObject, "calendarId", null);
-          console.log("eventId", eventId);
-          console.log("calendarId", calendarId);
-          console.log("clientResponse", clientResponse);
+
           // get conversation by message id
           const conversationData = await getConversationByMessageId(
             contextMessageId
           ).catch((error) => {
             console.error("error getting conversation", error);
           });
-          const user = await getUserByEventId(eventId);
-          const accessToken = get(user, "google_session.accessToken", null);
-          const conversation = get(
-            conversationData,
-            "data.data[0].attributes",
-            null
-          );
+          const userData = await getUserByEventId(eventId);
 
-          // const token = get(conversation, "user.data.attributes.ggToken", null);
-          let summaryReference;
-
-          if (accessToken) {
-            googleAPI.defaults.headers.common[
-              "Authorization"
-            ] = `Bearer ${accessToken}`;
-            const event = await getEvent({ calendarId, eventId }).catch(
-              (error) => {
-                console.error("error getting event", error);
-              }
-            );
-            summaryReference = get(event, "data.summary", null);
-          }
-
-          if (clientResponse === "attend") {
-            const response = await updateEvent({
-              calendarId,
-              eventId,
-              params: {
-                summary: parseEventTitle({
-                  titleRef: summaryReference,
-                  response: clientResponse,
-                }),
-              },
-            }).catch((error) => {
-              console.error("error updating event", error);
-            });
-            msg_body = "¡Gracias por confirmar tu cita!";
-          }
-          if (clientResponse === "cancel") {
-            const response = await updateEvent({
-              calendarId,
-              eventId,
-              params: {
-                summary: parseEventTitle({
-                  titleRef: summaryReference,
-                  response: clientResponse,
-                }),
-              },
-            }).catch((error) => {
-              console.error("error updating event", error);
-            });
-            msg_body = "¡Gracias por notificarnos!";
-          }
-          if (clientResponse === "reschedule") {
-            const response = await updateEvent({
-              calendarId,
-              eventId,
-              params: {
-                summary: parseEventTitle({
-                  titleRef: summaryReference,
-                  response: clientResponse,
-                }),
-              },
-            }).catch((error) => {
-              console.error("error updating event", error);
-            });
-            const userRemindersConfig = get(
-              conversation,
-              "user.data.attributes.remindersConfig",
-              null
-            );
-
-            const contactName = get(userRemindersConfig, "wsContactName", null);
-            console.log("contactName", contactName);
-            axios({
-              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-              url:
-                "https://graph.facebook.com/v17.0/" +
-                phone_number_id +
-                "/messages?access_token=" +
+          if (userData) {
+            const userId = get(userData, "id", null);
+            const googleSession = get(userData, "google_session", null);
+            if (!isExpired(googleSession?.accessTokenExpires)) {
+              const params = {
+                userId,
+                reminderStatus: clientResponse,
+                calendarId,
+                eventId,
+                accessToken: googleSession?.accessToken,
+              };
+              handleUpdateEvent;
+              msg_body = await handleUpdateEvent({
+                params,
+                conversationData,
+                phone_number_id,
                 WStoken,
-              data: {
-                to: from,
-                messaging_product: "whatsapp",
-                type: "contacts",
-                contacts: [
-                  {
-                    name: {
-                      first_name: contactName,
-                      formatted_name: contactName,
-                    },
-                    phones: [
-                      {
-                        wa_id: "593993950137",
-                        type: "WORK",
-                      },
-                    ],
-                  },
-                ],
-              },
-              headers: { "Content-Type": "application/json" },
-            }).catch((error) => {
-              console.log("error sending contact", error);
-            });
-            console.log("response sending 200");
-            res.sendStatus(200);
-            return;
+                from,
+              });
+            }
+            if (isExpired(googleSession?.accessTokenExpires)) {
+              console.log("access token expired, refreshing it");
+              const response = await refreshToken(googleSession?.refreshToken);
+              console.log("response", response);
+              const accessTokenExpires =
+                Date.now() + response?.expires_in * 1000;
+
+              const params = {
+                userId,
+                reminderStatus: clientResponse,
+                googleSession: {
+                  refreshToken:
+                    response?.refresh_token ??
+                    userData?.google_session?.refreshToken,
+                  accessToken: response?.access_token,
+                  accessTokenExpires,
+                },
+              };
+              //
+              try {
+                msg_body = await handleUpdateEvent({
+                  params,
+                  conversationData,
+                  phone_number_id,
+                  WStoken,
+                  from,
+                });
+                console.log("msg_body", msg_body);
+              } catch (error) {}
+
+              // update user's google session with new access token
+              await updateGoogleSession(params);
+            }
           }
         } else {
-          console.log("text message line 273");
           msg_body = messages[0]?.text?.body; // extract the message text from the webhook payload
         }
-
-        axios({
-          method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-          url:
-            "https://graph.facebook.com/v17.0/" +
-            phone_number_id +
-            "/messages?access_token=" +
-            WStoken,
-          data: {
-            messaging_product: "whatsapp",
-            to: from,
-            text: { body: msg_body },
-          },
-          headers: { "Content-Type": "application/json" },
-        });
+        if (msg_body) {
+          axios({
+            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+            url:
+              "https://graph.facebook.com/v17.0/" +
+              phone_number_id +
+              "/messages?access_token=" +
+              WStoken,
+            data: {
+              messaging_product: "whatsapp",
+              to: from,
+              text: { body: msg_body },
+            },
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       }
     } else {
       // Return a '404 Not Found' if event is not from a WhatsApp API
       res.sendStatus(404);
     }
-    console.log("response sending 200");
+    console.log("executing line 343 before sending 200 ");
     res.sendStatus(200);
   } catch (error) {
+    console.log("error line 403", error);
     console.error(error);
     res.sendStatus(500); // Enviar una respuesta de error si ocurre alguna excepción
   }

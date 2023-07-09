@@ -12,6 +12,7 @@ const getEvent = async ({ eventId, calendarId }) => {
 };
 
 const updateEvent = async ({ eventId, calendarId, params }) => {
+  console.log("in function updateEvent line 15");
   try {
     const response = await googleAPI.patch(
       `calendar/v3/calendars/${calendarId}/events/${eventId}`,

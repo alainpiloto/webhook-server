@@ -27,4 +27,28 @@ const updateUser = async ({ userId, params }) => {
   }
 };
 
-module.exports = { getUsers, updateUser };
+const updateGoogleSession = async (params) => {
+  const { userId, refreshToken, accessToken, accessTokenExpires } = params;
+  console.log(userId, "userId");
+  try {
+    const response = await strapi.put(
+      `api/users/${userId}`,
+
+      {
+        googleSession: {
+          refreshToken,
+          accessToken,
+          accessTokenExpires,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error, "error updating google session");
+  }
+};
+module.exports = { getUsers, updateUser, updateGoogleSession };

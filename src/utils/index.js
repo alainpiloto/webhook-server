@@ -69,7 +69,7 @@ const getNewStatus = (body) => {
 
 const parseEventTitle = ({ titleRef, response }) => {
   const responseColors = {
-    sent: "🟡",
+    delivered: "🟡",
     attend: "🟢",
     cancel: "🔴",
     reschedule: "🟣",

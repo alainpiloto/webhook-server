@@ -28,8 +28,32 @@ const getUserByEventId = async (eventId) => {
   return user;
 };
 
+const getUserByMessageId = async (message_id) => {
+  const user = await prisma.up_users.findFirst({
+    include: {
+      conversations_user_links: {
+        include: {
+          conversations: true,
+        },
+      },
+    },
+
+    where: {
+      conversations_user_links: {
+        some: {
+          conversations: {
+            init_message_id: message_id,
+          },
+        },
+      },
+    },
+  });
+  return user;
+};
+
 module.exports = {
   getUsers,
+  getUserByMessageId,
   getUserByEventId,
 };
 // kill $(lsof -t -i:1339)
